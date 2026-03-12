@@ -1,3 +1,76 @@
+# SeyoAWE Community – Full DevOps Lifecycle & Automation Engine
+
+## 🏗️ DevOps Architecture & Tech Stack
+
+**Architecture Schema:**
+![DevOps Architecture Schema](./Scheme.png)
+
+* **Source Control:** GitHub
+* **CI/CD Orchestration:** Jenkins
+* **Containerization & Registry:** Docker & Docker Hub
+* **Infrastructure as Code (IaC):** Terraform
+* **Configuration Management:** Ansible
+* **Container Orchestration:** Kubernetes (K8s)
+* **Observability (Bonus):** Prometheus & Grafana
+
+## 📂 DevOps Repository Structure
+```text
+.
+├── engine/        # Automation engine source code
+├── cli/           # CLI implementation source code
+├── docker/        # Dockerfiles for Engine and CLI
+├── k8s/           # Kubernetes manifests (StatefulSets, Services, PVCs)
+├── terraform/     # Infrastructure provisioning scripts
+├── ansible/       # Configuration playbooks for node setup
+├── jenkins/       # Jenkinsfiles for CI/CD pipelines
+├── monitoring/    # Prometheus & Grafana configuration (Bonus)
+└── Scheme.png     # DevOps Architecture Diagram
+```
+
+## 🚀 CI/CD Pipeline Flow
+
+This project utilizes a version-coupled, multi-pipeline approach to ensure efficient builds and deployments.
+
+### 1. Continuous Integration (CI)
+The CI process is split into two pipelines that share semantic versioning to avoid unnecessary rebuilds.
+* **Engine Pipeline:** Triggers on changes to `engine/`. Runs linting, executes unit tests, builds the Docker image, tags it with semantic versioning, and pushes the artifact to Docker Hub.
+* **CLI Pipeline:** Triggers on changes to `cli/`. Executes unit tests, packages the CLI tool, tags it with the shared semantic version, and publishes the artifact.
+
+### 2. Continuous Deployment (CD)
+Once the CI pipelines successfully publish the new artifacts, the CD pipeline handles the rollout:
+1. **Provisioning:** Terraform provisions the necessary underlying infrastructure (e.g., VMs, networking).
+2. **Configuration:** Ansible runs playbooks to configure the provisioned servers with required dependencies.
+3. **Deployment:** Jenkins applies the updated Kubernetes manifests (`k8s/`) to the cluster. The Engine is deployed as a **StatefulSet** with persistent storage (PVCs) and configured health probes. 
+
+## ⚙️ Setup and Operations
+
+### Prerequisites
+* Jenkins server with Docker, Terraform, and kubectl installed.
+* Configured credentials in Jenkins for GitHub, Docker Hub, and your Cloud Provider.
+* An active Kubernetes cluster.
+
+### Deployment Steps
+1. **Infrastructure:** Navigate to the `terraform/` directory and run `terraform init` and `terraform apply` to spin up the base infrastructure.
+2. **Configuration:** Execute the Ansible playbooks in the `ansible/` directory against the newly provisioned IP addresses.
+3. **Pipelines:** Import the Jenkinsfiles located in the `jenkins/` folder into your Jenkins server as Multibranch Pipelines.
+4. **Monitor:** Access the Grafana dashboard via the configured Ingress/Service port to view system metrics.
+
+## 📊 Observability (Bonus)
+The Kubernetes cluster includes a deployed Prometheus instance that scrapes metrics from the Engine and Kubernetes nodes. Grafana is connected to Prometheus as a data source, providing visual dashboards and alerting for CPU, memory, and application-specific health metrics.
+
+<br>
+
+---
+---
+
+# ⬇️ ORIGINAL SEYOAWE PROJECT DOCUMENTATION ⬇️
+*Note: The following section is the original, unmodified documentation from the base SeyoAWE repository.*
+
+---
+---
+
+<br>
+
 # ⚙️ SeyoAWE — Universal Workflow Automation Engine
 
 **Version:** 1.0  
@@ -224,8 +297,8 @@ SeyoAWE is dual-licensed:
 
 | Edition            | License       | Details                                                |
 |--------------------|---------------|--------------------------------------------------------|
-| **Community**      | Custom        | Free to use internally. No resale or monetization.     |
-| **Commercial**     | Proprietary   | Adds DB, secrets, premium modules, premium support,    |
+| **Community** | Custom        | Free to use internally. No resale or monetization.     |
+| **Commercial** | Proprietary   | Adds DB, secrets, premium modules, premium support,    |
 |                    |               | dashboards and reports and more.                       |
 
 See [`LICENSE`](./LICENSE) for full details.
