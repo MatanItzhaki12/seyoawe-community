@@ -1,0 +1,98 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" version="29.6.1">
+  <diagram name="Page-1" id="fPRnPoRz_HN4sk9oHDjJ">
+    <mxGraphModel dx="1019" dy="531" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-1" parent="1" style="whiteSpace=wrap;strokeWidth=2;verticalAlign=top;" value="Kubernetes Cluster" vertex="1">
+          <mxGeometry height="307" width="453" x="321" y="755" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-2" parent="c7Dc5ik17HZeyCUoyosM-1" style="whiteSpace=wrap;strokeWidth=2;" value="Engine StatefulSet" vertex="1">
+          <mxGeometry height="54" width="192" x="43" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-3" parent="c7Dc5ik17HZeyCUoyosM-1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;" value="Persistent Volume" vertex="1">
+          <mxGeometry height="79" width="143" x="67" y="199" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-4" parent="c7Dc5ik17HZeyCUoyosM-1" style="whiteSpace=wrap;strokeWidth=2;" value="CLI Tool Utility" vertex="1">
+          <mxGeometry height="54" width="165" x="260" y="211" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-5" edge="1" parent="c7Dc5ik17HZeyCUoyosM-1" source="c7Dc5ik17HZeyCUoyosM-2" style="curved=1;startArrow=none;endArrow=block;exitX=0.5;exitY=0.99;entryX=0.5;entryY=-0.01;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-3" value="Stores State &amp; Logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-6" parent="1" style="ellipse;aspect=fixed;strokeWidth=2;whiteSpace=wrap;" value="Developer" vertex="1">
+          <mxGeometry height="87" width="87" x="247" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-7" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="GitHub Repository" vertex="1">
+          <mxGeometry height="54" width="190" x="196" y="201" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-8" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="Jenkins CI/CD" vertex="1">
+          <mxGeometry height="54" width="160" x="211" y="329" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-9" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;" value="Docker Hub" vertex="1">
+          <mxGeometry height="72" width="97" x="172" y="457" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-10" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="Terraform" vertex="1">
+          <mxGeometry height="54" width="131" x="374" y="466" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-11" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="Ansible" vertex="1">
+          <mxGeometry height="54" width="112" x="384" y="603" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-12" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="Prometheus &amp; Grafana" vertex="1">
+          <mxGeometry height="54" width="222" x="545" y="603" as="geometry" />
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-13" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-6" style="curved=1;startArrow=none;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-7" value="Push Code">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-14" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-7" style="curved=1;startArrow=none;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-8" value="Webhook">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-15" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-8" style="curved=1;startArrow=none;endArrow=block;exitX=0.13;exitY=1;entryX=0.14;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-9" value="Build &amp; Push Image">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-16" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-9" style="curved=1;startArrow=none;endArrow=block;exitX=0.86;exitY=0;entryX=0.5;entryY=1;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-8" value="Pull Latest Tag">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="291" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-17" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-8" style="curved=1;startArrow=none;endArrow=block;exitX=0.89;exitY=1;entryX=0.5;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-10" value="1. Provision Infra">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="439" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-18" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-10" style="curved=1;startArrow=none;endArrow=block;exitX=0.5;exitY=1;entryX=0.49;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-11" value="2. Configure Nodes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-19" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-11" style="curved=1;startArrow=none;endArrow=block;exitX=0.49;exitY=1;entryX=0.32;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-1" value="3. Deploy Manifests">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="439" y="706" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7Dc5ik17HZeyCUoyosM-20" edge="1" parent="1" source="c7Dc5ik17HZeyCUoyosM-12" style="curved=1;dashed=1;dashPattern=2 3;startArrow=none;endArrow=block;exitX=0.5;exitY=1;entryX=0.68;entryY=0;rounded=0;" target="c7Dc5ik17HZeyCUoyosM-1" value="Pulls Metrics from Engine &amp; Nodes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="656" y="706" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
