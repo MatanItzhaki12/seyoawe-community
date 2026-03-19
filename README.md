@@ -2,8 +2,14 @@
 
 ## 🏗️ DevOps Architecture & Tech Stack
 
-**Architecture Schema:**
-![DevOps Architecture Schema](./Scheme.png)
+**Cloud Architecture:**
+![DevOps Cloud Architecture](./Cloud_Arch.png)
+
+**CI/CD Architecture:**
+![CI/CD Architecture](./CICD_Arch.png)
+
+**Deployment Workflow Architecture:**
+![Deployment Workflow Architecture](./Deployment_Arch.png)
 
 * **Source Control:** GitHub
 * **CI/CD Orchestration:** Jenkins
