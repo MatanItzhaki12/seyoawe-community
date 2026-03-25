@@ -9,7 +9,7 @@
 ![CI/CD Architecture](./CICD_Arch.png)
 
 **Deployment Workflow Architecture:**
-![Deployment Workflow Architecture](./Deployment_Arch.png)
+![Deployment Workflow Architecture](./Workflow_Arch.png)
 
 * **Source Control:** GitHub
 * **CI/CD Orchestration:** Jenkins
