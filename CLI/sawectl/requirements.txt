@@ -1,0 +1,4 @@
+pyyaml
+jsonschema>=4.18
+requests
+argparse

@@ -3,13 +3,13 @@
 ## 🏗️ DevOps Architecture & Tech Stack
 
 **Cloud Architecture:**
-![DevOps Cloud Architecture](./Cloud_Arch.png)
+![DevOps Cloud Architecture](./schemes/Cloud_Arch.png)
 
 **CI/CD Architecture:**
-![CI/CD Architecture](./CICD_Arch.png)
+![CI/CD Architecture](./schemes/CICD_Arch.png)
 
 **Deployment Workflow Architecture:**
-![Deployment Workflow Architecture](./Workflow_Arch.png)
+![Deployment Workflow Architecture](./schemes/Workflow_Arch.png)
 
 * **Source Control:** GitHub
 * **CI/CD Orchestration:** Jenkins
@@ -22,15 +22,14 @@
 ## 📂 DevOps Repository Structure
 ```text
 .
-├── engine/        # Automation engine source code
-├── cli/           # CLI implementation source code
+├── Engine/        # Automation engine runtime, modules, and app workflows
+├── CLI/           # sawectl source code and platform binaries
+├── infra/         # Terraform + Ansible structure
 ├── docker/        # Dockerfiles for Engine and CLI
-├── k8s/           # Kubernetes manifests (StatefulSets, Services, PVCs)
-├── terraform/     # Infrastructure provisioning scripts
-├── ansible/       # Configuration playbooks for node setup
-├── jenkins/       # Jenkinsfiles for CI/CD pipelines
-├── monitoring/    # Prometheus & Grafana configuration (Bonus)
-└── Scheme.png     # DevOps Architecture Diagram
+├── .github/       # GitHub Actions workflows
+├── schemes/       # Drawio and architecture images
+├── tests/         # Test suite
+└── task/          # Checklist, exercise PDF, and planning blueprints
 ```
 
 ## 🚀 CI/CD Pipeline Flow
@@ -39,26 +38,26 @@ This project utilizes a version-coupled, multi-pipeline approach to ensure effic
 
 ### 1. Continuous Integration (CI)
 The CI process is split into two pipelines that share semantic versioning to avoid unnecessary rebuilds.
-* **Engine Pipeline:** Triggers on changes to `engine/`. Runs linting, executes unit tests, builds the Docker image, tags it with semantic versioning, and pushes the artifact to Docker Hub.
-* **CLI Pipeline:** Triggers on changes to `cli/`. Executes unit tests, packages the CLI tool, tags it with the shared semantic version, and publishes the artifact.
+* **Engine Pipeline:** Triggers on changes to `Engine/`. Runs linting, executes unit tests, builds the Docker image, tags it with semantic versioning, and pushes the artifact to Docker Hub.
+* **CLI Pipeline:** Triggers on changes to `CLI/`. Executes unit tests, packages the CLI tool, tags it with the shared semantic version, and publishes the artifact.
 
 ### 2. Continuous Deployment (CD)
 Once the CI pipelines successfully publish the new artifacts, the CD pipeline handles the rollout:
 1. **Provisioning:** Terraform provisions the necessary underlying infrastructure (e.g., VMs, networking).
 2. **Configuration:** Ansible runs playbooks to configure the provisioned servers with required dependencies.
-3. **Deployment:** Jenkins applies the updated Kubernetes manifests (`k8s/`) to the cluster. The Engine is deployed as a **StatefulSet** with persistent storage (PVCs) and configured health probes. 
+3. **Deployment:** GitHub Actions orchestrates Terraform and Ansible stages and then applies Kubernetes manifests. The Engine is deployed as a **StatefulSet** with persistent storage (PVCs) and configured health probes. 
 
 ## ⚙️ Setup and Operations
 
 ### Prerequisites
-* Jenkins server with Docker, Terraform, and kubectl installed.
-* Configured credentials in Jenkins for GitHub, Docker Hub, and your Cloud Provider.
+* GitHub Actions enabled on your repository.
+* Configured repository secrets for Docker Hub and your Cloud Provider.
 * An active Kubernetes cluster.
 
 ### Deployment Steps
-1. **Infrastructure:** Navigate to the `terraform/` directory and run `terraform init` and `terraform apply` to spin up the base infrastructure.
-2. **Configuration:** Execute the Ansible playbooks in the `ansible/` directory against the newly provisioned IP addresses.
-3. **Pipelines:** Import the Jenkinsfiles located in the `jenkins/` folder into your Jenkins server as Multibranch Pipelines.
+1. **Infrastructure:** Navigate to `infra/terraform/` and run `terraform init` and `terraform apply` to spin up the base infrastructure.
+2. **Configuration:** Execute playbooks from `infra/ansible/playbooks/` against the newly provisioned hosts.
+3. **Pipelines:** Use workflows under `.github/workflows/` for CI/CD orchestration.
 4. **Monitor:** Access the Grafana dashboard via the configured Ingress/Service port to view system metrics.
 
 ## 📊 Observability (Bonus)
@@ -116,12 +115,12 @@ Define powerful, reliable workflows in YAML — with built-in support for approv
 ### 🚀 Running SeyoAWE (Local Engine)
 
 ```bash
-./run.sh linux   # or ./run.sh macos
+./Engine/run.sh linux   # or ./Engine/run.sh macos
 ```
 
 This launches the Flask-powered SeyoAWE runtime at `http://localhost:8080`.
 
-Your `configurations/config.yaml` should point to:
+Your `Engine/configuration/config.yaml` should point to:
 ```yaml
 directories:
   workdir: /path/to/seyoawe-execution-plane
@@ -134,10 +133,10 @@ directories:
 ## 🧬 Writing Your First Workflow
 
 ```bash
-sawectl workflow init hello-world
+sawectl init workflow hello-world
 ```
 
-Creates a scaffold in `workflows/hello-world.yaml`.
+Creates a scaffold in `Engine/workflows/hello-world.yaml`.
 
 ### 🧾 Example Workflow
 
@@ -159,7 +158,7 @@ steps:
 ### 💡 Run it
 
 ```bash
-sawectl run workflows/hello-world.yaml
+sawectl run --workflow Engine/workflows/default/hello-world.yaml --server localhost:8080
 ```
 
 ---
@@ -174,8 +173,8 @@ The official CLI tool to manage, validate, and run workflows.
 sawectl run <path.yaml>             # Run ad-hoc workflow
 sawectl validate-workflow <wf.yaml> # Deep schema + module validation
 sawectl list-modules                # View installed modules
-sawectl workflow init <name>        # Scaffold a new workflow
-sawectl module create <name>        # Scaffold a custom module
+sawectl init workflow <name>        # Scaffold a new workflow
+sawectl init module <name>          # Scaffold a custom module
 ```
 
 ---

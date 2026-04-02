@@ -1,0 +1,12 @@
+workflow:
+  name: hello-world
+  trigger:
+    type: ad-hoc
+
+  steps:
+    - id: run_echo
+      type: action
+      action: command_module.Command.run
+      input:
+        command: "echo Hello from SeyoAWE"
+      register_output: echo_result

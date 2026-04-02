@@ -1,0 +1,13 @@
+FROM ubuntu:22.04
+
+WORKDIR /app
+
+COPY Engine/seyoawe.linux /app/seyoawe.linux
+COPY Engine/configuration /app/configuration
+COPY Engine/modules /app/modules
+COPY Engine/workflows /app/workflows
+
+RUN chmod +x /app/seyoawe.linux
+
+EXPOSE 8080
+ENTRYPOINT ["/app/seyoawe.linux"]

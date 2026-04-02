@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY CLI/sawectl/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY CLI/sawectl /app/sawectl
+COPY Engine/modules /app/modules
+COPY Engine/workflows /app/workflows
+
+ENTRYPOINT ["python", "/app/sawectl/sawectl.py"]
+CMD ["--help"]
