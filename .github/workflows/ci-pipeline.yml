@@ -1,0 +1,136 @@
+name: CI Pipeline
+
+on:
+  push:
+
+jobs:
+  run-tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -r CLI/sawectl/requirements.txt
+
+      - name: Start Engine and CLI (Docker Compose)
+        run: docker compose -f docker-compose.test.yml up -d --build --wait
+
+      - name: Run pytest (unit, integration, e2e)
+        env:
+          SEYOAWE_ENGINE: 127.0.0.1:8080
+        run: pytest -v tests
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v
+
+  on-failure:
+    name: Handle Failure
+    needs: run-tests
+    runs-on: ubuntu-latest
+    if: ${{ always() && needs.run-tests.result == 'failure' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Placeholder — Open Jira ticket
+        run: |
+          # TODO: Replace with Jira REST API (create issue linked to this run).
+          echo "PLACEHOLDER: Open Jira ticket for failed CI Pipeline"
+          echo "run_id=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY} sha=${GITHUB_SHA}"
+
+      - name: Placeholder — Send email notification
+        run: |
+          # TODO: Replace with email/SMTP or provider API.
+          echo "PLACEHOLDER: Send email notification for failed CI Pipeline"
+          echo "run_id=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY}"
+
+  build-and-push:
+    name: Build and Publish to Docker Hub
+    needs: run-tests
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        always()
+        && needs.run-tests.result == 'success'
+        && github.ref_name == github.event.repository.default_branch
+      }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git author for tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next minor version
+        id: ver
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          set +o pipefail
+          LAST="$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
+          set -o pipefail
+          if [ -z "${LAST}" ]; then
+            NEW_VERSION="0.1.0"
+          else
+            BASE="${LAST#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${BASE}"
+            MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.0"
+          fi
+          echo "version=${NEW_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Computed release version: v${NEW_VERSION} (previous tag: ${LAST:-none})"
+
+      - name: Create and push Git tag
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.ver.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Local tag ${TAG} already exists; skipping create."
+          else
+            git tag -a "${TAG}" -m "Release ${TAG}"
+          fi
+          git push origin "refs/tags/${TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Engine and CLI images
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          set -euo pipefail
+          ENGINE_IMAGE="${DOCKERHUB_NAMESPACE}/seyoawe-engine"
+          CLI_IMAGE="${DOCKERHUB_NAMESPACE}/seyoawe-cli"
+          docker build -f docker/dockerfile.engine \
+            -t "${ENGINE_IMAGE}:${VERSION}" -t "${ENGINE_IMAGE}:latest" .
+          docker build -f docker/dockerfile.cli \
+            -t "${CLI_IMAGE}:${VERSION}" -t "${CLI_IMAGE}:latest" .
+          docker push "${ENGINE_IMAGE}:${VERSION}"
+          docker push "${ENGINE_IMAGE}:latest"
+          docker push "${CLI_IMAGE}:${VERSION}"
+          docker push "${CLI_IMAGE}:latest"

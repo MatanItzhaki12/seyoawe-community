@@ -1,0 +1,41 @@
+# CI/local E2E: Engine + idle CLI on one network. Pytest runs on the host and hits localhost:8080.
+#
+#   docker compose -f docker-compose.test.yml up -d --build --wait
+#   set SEYOAWE_ENGINE=127.0.0.1:8080   # optional; default matches this
+#   pytest -q
+
+services:
+  engine:
+    build:
+      context: .
+      dockerfile: docker/dockerfile.engine
+    ports:
+      - "8080:8080"
+    networks:
+      - seyoawe_test
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 1 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8080' || exit 1",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
+  cli:
+    build:
+      context: .
+      dockerfile: docker/dockerfile.cli
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
+    networks:
+      - seyoawe_test
+    depends_on:
+      engine:
+        condition: service_healthy
+
+networks:
+  seyoawe_test:
+    driver: bridge

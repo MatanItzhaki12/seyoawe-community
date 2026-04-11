@@ -17,31 +17,21 @@ Use this as the single source of truth for:
 - [ ] Kubernetes manifests exist under `k8s/`
 - [ ] Engine deployed as StatefulSet with probes + PVC + service
 
-### 2. CI Pipeline for Engine
-- [x] Engine CI workflow exists: `.github/workflows/ci-engine.yml`
-- [x] Runs tests (`pytest -q tests`)
-- [x] Builds engine Docker image
-- [x] Guards binary presence (`Engine/seyoawe.linux`)
-- [ ] Pushes image to Docker Hub in CI stage
-
-### 3. CI Pipeline for CLI
-- [x] CLI CI workflow exists: `.github/workflows/ci-cli.yml`
-- [x] Installs CLI deps from `CLI/sawectl/requirements.txt`
-- [x] Runs tests (`pytest -q tests`)
-- [x] Builds CLI Docker image
-- [ ] Publishes CLI packaging artifact (if required by course rubric)
+### 2–3. Unified CI Pipeline (Engine + CLI)
+- [x] CI workflow exists: `.github/workflows/ci-pipeline.yml`
+- [x] Docker Compose test stack + `pytest` (unit / integration / e2e)
+- [x] Builds and pushes **both** engine and CLI images on default branch after green tests
+- [x] Guards engine binary via Docker build context (`Engine/seyoawe.linux`)
 
 ### 4. Version Coupling (Engine + CLI)
-- [x] Shared version job in `.github/workflows/release-and-deploy.yml`
-- [x] Change detection for engine/cli components to avoid unnecessary rebuilds
-- [x] Semver robustness fix for malformed tags (safe fallback behavior)
+- [x] Shared minor SemVer bump + git tag in `ci-pipeline.yml` (`build-and-push` job)
+- [ ] Optional: path-based rebuild skips (only rebuild what changed)
 - [ ] Optional: smarter bumping strategy (conventional commits / release rules)
 
 ### 5. Continuous Deployment Pipeline
-- [x] Release workflow exists: `.github/workflows/release-and-deploy.yml`
-- [x] Docker push stages for both images present
+- [x] CD placeholder workflow: `.github/workflows/cd-deploy-aws.yml` (Terraform/Ansible/K8s echoes)
 - [x] Infra skeleton exists at `infra/terraform/` and `infra/ansible/`
-- [ ] Replace deploy placeholder with real Terraform + Ansible + Kubernetes steps
+- [ ] Replace CD placeholders with real Terraform + Ansible + Kubernetes steps
 
 ### 6. Observability (Bonus)
 - [ ] `monitoring/` folder with Prometheus + Grafana config
@@ -97,7 +87,7 @@ Use this as the single source of truth for:
 
 ### Phase A: Complete Deployable Platform
 - [ ] Add `k8s/` manifests (namespace, StatefulSet, service, ingress/PVC)
-- [ ] Implement real deploy job in `release-and-deploy.yml`:
+- [ ] Implement real deploy job in `cd-deploy-aws.yml`:
   - `terraform init/plan/apply`
   - ansible playbook execution
   - `kubectl apply` or Helm rollout

@@ -6,15 +6,13 @@ It aligns with the project PDF requirements and the architecture diagrams.
 ## Current Baseline
 
 - GitHub Actions workflows added:
-  - `.github/workflows/ci-engine.yml`
-  - `.github/workflows/ci-cli.yml`
-  - `.github/workflows/release-and-deploy.yml`
+  - `.github/workflows/ci-pipeline.yml` (tests + version + Docker Hub)
+  - `.github/workflows/cd-deploy-aws.yml` (AWS/EKS placeholder, triggered after CI on default branch)
 - Starter Dockerfiles:
   - `docker/dockerfile.engine`
   - `docker/dockerfile.cli`
-- Basic test scaffolding:
-  - `tests/test_unit.py`
-  - `tests/test_integration.py`
+- Test layout:
+  - `tests/unit/`, `tests/integration/`, `tests/e2e/`, `docker-compose.test.yml`
 
 ## Target Architecture Mapping
 
@@ -36,7 +34,7 @@ It aligns with the project PDF requirements and the architecture diagrams.
 
 ## 2) Shared Semantic Versioning (Engine + CLI)
 
-- Keep a single shared SemVer generated in `release-and-deploy.yml`.
+- Keep a single shared SemVer generated in `ci-pipeline.yml` (`build-and-push` job).
 - Promote from naive patch bump to conventional commits or release notes based bumping.
 - Persist version into a generated artifact file, for example `build/version.txt`.
 - Include the same version in both image tags and release tag.
@@ -110,7 +108,7 @@ Create `monitoring/` with:
 
 ## 8) CD Workflow Completion
 
-In `.github/workflows/release-and-deploy.yml` replace placeholder deploy job with:
+In `.github/workflows/cd-deploy-aws.yml` replace placeholder steps with:
 
 1. Terraform plan/apply
 2. Ansible playbooks

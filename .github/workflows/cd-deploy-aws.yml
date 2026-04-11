@@ -1,0 +1,26 @@
+name: CD — Deploy AWS (placeholder)
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  aws-deploy-placeholder:
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Provision AWS infra (placeholder)
+        run: echo "Provision AWS Infra using Terraform"
+
+      - name: Configure nodes (placeholder)
+        run: echo "Configure Nodes using Ansible"
+
+      - name: Deploy to EKS (placeholder)
+        run: echo "Deploy Kubernetes manifests to EKS"
