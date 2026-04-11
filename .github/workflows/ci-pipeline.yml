@@ -44,17 +44,81 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Placeholder — Open Jira ticket
+      - name: Create Jira issue
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          # TODO: Replace with Jira REST API (create issue linked to this run).
-          echo "PLACEHOLDER: Open Jira ticket for failed CI Pipeline"
-          echo "run_id=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY} sha=${GITHUB_SHA}"
+          set -euo pipefail
+          BASE="${JIRA_BASE_URL%/}"
+          DESC=$(
+            printf '%s\n\n%s\n%s\n%s\n%s\n%s' \
+              "CI Pipeline failure — inspect the GitHub Actions run for logs." \
+              "Failed run (link):" \
+              "${RUN_URL}" \
+              "Workflow: ${GITHUB_WORKFLOW}" \
+              "Branch: ${GITHUB_REF_NAME}" \
+              "Commit: ${GITHUB_SHA}"
+          )
+          BODY=$(jq -n \
+            --arg summary "CI Pipeline Failed: ${GITHUB_REPOSITORY}" \
+            --arg proj "${JIRA_PROJECT_KEY}" \
+            --arg text "${DESC}" \
+            '{
+              fields: {
+                project: { key: $proj },
+                summary: $summary,
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [ { type: "text", text: $text } ]
+                    }
+                  ]
+                },
+                issuetype: { name: "Task" }
+              }
+            }')
+          HTTP_CODE=$(curl -sS -o /tmp/jira_create_response.json -w "%{http_code}" \
+            -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            "${BASE}/rest/api/3/issue" \
+            -d "${BODY}")
+          if [[ "${HTTP_CODE}" -lt 200 || "${HTTP_CODE}" -ge 300 ]]; then
+            echo "Jira REST API returned HTTP ${HTTP_CODE}"
+            cat /tmp/jira_create_response.json
+            exit 1
+          fi
+          echo "Jira issue created:"
+          cat /tmp/jira_create_response.json
 
-      - name: Placeholder — Send email notification
-        run: |
-          # TODO: Replace with email/SMTP or provider API.
-          echo "PLACEHOLDER: Send email notification for failed CI Pipeline"
-          echo "run_id=${GITHUB_RUN_ID} repo=${GITHUB_REPOSITORY}"
+      - name: Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          subject: "GitHub Actions Failure: ${{ github.repository }}"
+          body: |
+            Workflow: ${{ github.workflow }}
+            Branch: ${{ github.ref_name }}
+
+            Failed run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   build-and-push:
     name: Build and Publish to Docker Hub
