@@ -1,0 +1,43 @@
+# Local stack: long-running engine + CLI on a shared Docker network.
+#
+# Kubernetes mapping (for later):
+# - `engine`  → Deployment + Service (ClusterIP or LoadBalancer); many replicas behind one DNS name.
+# - `cli`       → Job/CronJob, or short-lived Pods; `sawectl` is a client, not a server.
+# - Container DNS (`engine:8080`) → Service DNS (`engine.default.svc.cluster.local:8080`).
+#
+# Usage (from repo root):
+#   docker compose up -d --build
+#   docker compose exec cli sawectl run \
+#     --workflow /app/workflows/default/hello-world.yaml --server engine:8080
+#   docker compose down
+#
+# Host access to the engine: http://localhost:8080 (port forwarding on `engine`).
+
+services:
+  engine:
+    build:
+      context: .
+      dockerfile: docker/dockerfile.engine
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - seyoawe
+
+  # Idle container so you can `docker compose exec cli ...` without starting a new image each time.
+  # For many parallel one-shot commands, prefer: docker compose run --rm cli <args>
+  cli:
+    build:
+      context: .
+      dockerfile: docker/dockerfile.cli
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
+    restart: unless-stopped
+    networks:
+      - seyoawe
+    depends_on:
+      - engine
+
+networks:
+  seyoawe:
+    driver: bridge

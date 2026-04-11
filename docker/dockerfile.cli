@@ -9,5 +9,8 @@ COPY CLI/sawectl /app/sawectl
 COPY Engine/modules /app/modules
 COPY Engine/workflows /app/workflows
 
-ENTRYPOINT ["python", "/app/sawectl/sawectl.py"]
+RUN printf '%s\n' '#!/bin/sh' 'exec python3 /app/sawectl/sawectl.py "$@"' > /usr/local/bin/sawectl \
+    && chmod +x /usr/local/bin/sawectl
+
+ENTRYPOINT ["sawectl"]
 CMD ["--help"]
