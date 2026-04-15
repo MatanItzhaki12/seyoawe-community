@@ -10,7 +10,8 @@ jobs:
   destroy-aws:
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -22,14 +23,14 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform init
         working-directory: infrastructure/terraform
-        run: terraform init
+        run: terraform init -backend-config="region=${{ vars.AWS_REGION }}"
 
       - name: Terraform destroy
         working-directory: infrastructure/terraform
