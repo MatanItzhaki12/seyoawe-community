@@ -68,7 +68,7 @@ jobs:
 
       - name: Terraform apply
         working-directory: infrastructure/terraform
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -lock=false
 
       - name: Configure kubeconfig from Terraform output
         shell: bash
