@@ -33,4 +33,4 @@ jobs:
 
       - name: Terraform destroy
         working-directory: infrastructure/terraform
-        run: terraform destroy -auto-approve
+        run: terraform destroy -auto-approve -lock=false

@@ -154,7 +154,7 @@ resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
 resource "aws_eks_cluster" "this" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster.arn
-  version  = "1.29"
+  version  = "1.30"
 
   vpc_config {
     subnet_ids              = aws_subnet.private[*].id
@@ -206,7 +206,7 @@ resource "aws_eks_node_group" "this" {
   node_role_arn   = aws_iam_role.node_group.arn
   subnet_ids      = aws_subnet.private[*].id
   instance_types  = var.node_instance_types
-  ami_type        = "AL2_x86_64"
+  ami_type        = "AL2023_x86_64_STANDARD"
   capacity_type   = "ON_DEMAND"
 
   scaling_config {
