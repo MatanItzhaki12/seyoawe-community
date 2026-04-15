@@ -205,14 +205,15 @@ resource "aws_eks_node_group" "this" {
   node_group_name = "${var.cluster_name}-ng"
   node_role_arn   = aws_iam_role.node_group.arn
   subnet_ids      = aws_subnet.private[*].id
+  disk_size       = 20
   instance_types  = ["t3.small"]
   ami_type        = "AL2023_x86_64_STANDARD"
   capacity_type   = "ON_DEMAND"
 
   scaling_config {
-    desired_size = 1
-    min_size     = 1
-    max_size     = 1
+    desired_size = 2
+    min_size     = 2
+    max_size     = 2
   }
 
   depends_on = [
