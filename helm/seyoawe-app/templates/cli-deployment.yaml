@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "seyoawe-app.fullname" . }}-cli
+  labels:
+    app.kubernetes.io/name: {{ include "seyoawe-app.name" . }}
+    app.kubernetes.io/component: cli
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.cli.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "seyoawe-app.name" . }}
+      app.kubernetes.io/component: cli
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "seyoawe-app.name" . }}
+        app.kubernetes.io/component: cli
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: cli
+          image: "{{ .Values.cli.image.repository }}:{{ .Values.cli.image.tag }}"
+          imagePullPolicy: {{ .Values.cli.image.pullPolicy }}
+          command:
+            - sleep
+            - infinity
+          envFrom:
+            - configMapRef:
+                name: {{ include "seyoawe-app.fullname" . }}-cli-config

@@ -1,0 +1,50 @@
+---
+- name: Deploy monitoring stack and seyoawe app
+  hosts: localhost
+  gather_facts: false
+  vars:
+    app_version: "{{ app_version | default('latest') }}"
+    app_chart_path: "{{ playbook_dir }}/../../helm/seyoawe-app"
+
+  tasks:
+    - name: Ensure monitoring namespace exists
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: monitoring
+        state: present
+
+    - name: Ensure seyoawe namespace exists
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: seyoawe
+        state: present
+
+    - name: Add prometheus community helm repository
+      kubernetes.core.helm_repository:
+        name: prometheus-community
+        repo_url: https://prometheus-community.github.io/helm-charts
+
+    - name: Install or upgrade kube-prometheus-stack
+      kubernetes.core.helm:
+        name: kube-prometheus-stack
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: monitoring
+        create_namespace: true
+        wait: true
+
+    - name: Install or upgrade seyoawe application chart
+      kubernetes.core.helm:
+        name: seyoawe-app
+        chart_ref: "{{ app_chart_path }}"
+        release_namespace: seyoawe
+        create_namespace: true
+        wait: true
+        values:
+          engine:
+            image:
+              tag: "{{ app_version }}"
+          cli:
+            image:
+              tag: "{{ app_version }}"

@@ -1,0 +1,23 @@
+nameOverride: ""
+fullnameOverride: ""
+
+engine:
+  replicaCount: 1
+  image:
+    repository: seyoawe-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  persistence:
+    size: 10Gi
+    storageClassName: gp3
+    accessModes:
+      - ReadWriteOnce
+
+cli:
+  replicaCount: 1
+  image:
+    repository: seyoawe-cli
+    tag: latest
+    pullPolicy: IfNotPresent
