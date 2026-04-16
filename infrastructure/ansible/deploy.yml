@@ -1,5 +1,5 @@
 ---
-- name: Deploy monitoring stack and seyoawe app
+- name: Deploy kubernetes dashboard and seyoawe app
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,11 +7,11 @@
     app_chart_path: "{{ playbook_dir }}/../../helm/seyoawe-app"
 
   tasks:
-    - name: Ensure monitoring namespace exists
+    - name: Ensure kubernetes-dashboard namespace exists
       kubernetes.core.k8s:
         api_version: v1
         kind: Namespace
-        name: monitoring
+        name: kubernetes-dashboard
         state: present
 
     - name: Ensure seyoawe namespace exists
@@ -21,16 +21,16 @@
         name: seyoawe
         state: present
 
-    - name: Add prometheus community helm repository
+    - name: Add kubernetes-dashboard helm repository
       kubernetes.core.helm_repository:
-        name: prometheus-community
-        repo_url: https://prometheus-community.github.io/helm-charts
+        name: kubernetes-dashboard
+        repo_url: https://kubernetes.github.io/dashboard/
 
-    - name: Install or upgrade kube-prometheus-stack
+    - name: Install or upgrade kubernetes-dashboard
       kubernetes.core.helm:
-        name: kube-prometheus-stack
-        chart_ref: prometheus-community/kube-prometheus-stack
-        release_namespace: monitoring
+        name: kubernetes-dashboard
+        chart_ref: kubernetes-dashboard/kubernetes-dashboard
+        release_namespace: kubernetes-dashboard
         create_namespace: true
         wait: true
 
