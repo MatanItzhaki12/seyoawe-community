@@ -204,7 +204,7 @@ resource "aws_eks_node_group" "this" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${var.cluster_name}-ng"
   node_role_arn   = aws_iam_role.node_group.arn
-  subnet_ids      = aws_subnet.private[*].id
+  subnet_ids      = aws_subnet.public[*].id
   disk_size       = 20
   instance_types  = ["t3.small"]
   ami_type        = "AL2023_x86_64_STANDARD"
