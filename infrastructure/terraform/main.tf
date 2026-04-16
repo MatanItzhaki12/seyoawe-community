@@ -91,14 +91,15 @@ resource "aws_nat_gateway" "eks" {
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.eks.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.eks.id
-  }
-
   tags = merge(local.common_tags, {
     Name = "${var.cluster_name}-public-rt"
   })
+}
+
+resource "aws_route" "public_internet_access" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.eks.id
 }
 
 resource "aws_route_table_association" "public" {
