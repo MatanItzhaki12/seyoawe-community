@@ -91,7 +91,10 @@
     - name: Add kubernetes-dashboard helm repository
       kubernetes.core.helm_repository:
         name: kubernetes-dashboard
-        repo_url: https://kubernetes.github.io/dashboard/
+        # The original kubernetes.github.io/dashboard/ index returns 404. The
+        # chart is still published (currently at v7.x) at the "retired" org URL
+        # below despite its misleading name.
+        repo_url: https://kubernetes-retired.github.io/dashboard/
 
     - name: Install or upgrade kubernetes-dashboard
       kubernetes.core.helm:
