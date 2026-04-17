@@ -32,6 +32,42 @@ jobs:
         working-directory: infrastructure/terraform
         run: terraform init -backend-config="region=${{ vars.AWS_REGION }}"
 
+      # Best-effort cleanup of in-cluster resources that create AWS objects
+      # outside Terraform's view (LoadBalancers, dynamically provisioned PVs).
+      # If the cluster is already gone these steps no-op.
+      - name: Configure kubeconfig (best-effort)
+        id: kubeconfig
+        continue-on-error: true
+        shell: bash
+        working-directory: infrastructure/terraform
+        run: |
+          set -e
+          CLUSTER_NAME="$(terraform output -raw cluster_name 2>/dev/null || true)"
+          if [ -z "${CLUSTER_NAME}" ]; then
+            echo "No cluster_name output found; nothing to clean up in-cluster."
+            exit 0
+          fi
+          aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+
+      - name: Delete LoadBalancer Services (best-effort)
+        if: steps.kubeconfig.outcome == 'success'
+        continue-on-error: true
+        run: |
+          kubectl get svc --all-namespaces \
+            -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' \
+          | while read -r ns name; do
+              [ -z "${ns}" ] && continue
+              echo "Deleting LB service ${ns}/${name}"
+              kubectl -n "${ns}" delete svc "${name}" --wait=true --timeout=120s || true
+            done
+
+      - name: Uninstall seyoawe release and delete its PVCs (best-effort)
+        if: steps.kubeconfig.outcome == 'success'
+        continue-on-error: true
+        run: |
+          helm uninstall seyoawe-app -n seyoawe --wait --timeout=120s || true
+          kubectl delete pvc --all -n seyoawe --wait=true --timeout=120s || true
+
       - name: Terraform destroy
         working-directory: infrastructure/terraform
-        run: terraform destroy -auto-approve -lock=false
+        run: terraform destroy -auto-approve

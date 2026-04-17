@@ -1,19 +1,36 @@
 ---
-- name: Deploy monitoring stack and seyoawe app
+- name: Deploy seyoawe app and Kubernetes Dashboard to EKS
   hosts: localhost
   gather_facts: false
   vars:
     app_version: "{{ app_version | default('latest') }}"
+    image_namespace: "{{ image_namespace | default('') }}"
     app_chart_path: "{{ playbook_dir }}/../../helm/seyoawe-app"
+    dashboard_namespace: kubernetes-dashboard
+    dashboard_admin_user: admin
+    dashboard_admin_password: "{{ dashboard_admin_password | default('') }}"
+    dashboard_info_path: "{{ lookup('env', 'GITHUB_WORKSPACE') | default(playbook_dir, true) }}/dashboard-access.md"
+    tls_key_path: "/tmp/seyoawe-dashboard-proxy.key"
+    tls_crt_path: "/tmp/seyoawe-dashboard-proxy.crt"
+
+  pre_tasks:
+    - name: Ensure image_namespace is provided
+      ansible.builtin.fail:
+        msg: >-
+          image_namespace must be set (e.g. -e image_namespace=your-dockerhub-user)
+          so the Helm chart can resolve <namespace>/seyoawe-engine images.
+      when: image_namespace | length == 0
+
+    - name: Ensure dashboard_admin_password is provided
+      ansible.builtin.fail:
+        msg: >-
+          dashboard_admin_password must be set (forwarded from the
+          DASHBOARD_ADMIN_PASSWORD GitHub Actions secret). This is the
+          password that protects the public Dashboard URL.
+      when: dashboard_admin_password | length == 0
 
   tasks:
-    - name: Ensure monitoring namespace exists
-      kubernetes.core.k8s:
-        api_version: v1
-        kind: Namespace
-        name: monitoring
-        state: present
-
+    # --- Cluster-wide prerequisites ------------------------------------------
     - name: Ensure seyoawe namespace exists
       kubernetes.core.k8s:
         api_version: v1
@@ -21,19 +38,413 @@
         name: seyoawe
         state: present
 
-    - name: Add prometheus community helm repository
+    - name: Ensure gp3 StorageClass exists (backed by EBS CSI driver)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: gp3
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+          provisioner: ebs.csi.aws.com
+          volumeBindingMode: WaitForFirstConsumer
+          allowVolumeExpansion: true
+          parameters:
+            type: gp3
+            encrypted: "true"
+
+    # --- metrics-server (powers Dashboard usage graphs and `kubectl top`) ----
+    - name: Add metrics-server helm repository
       kubernetes.core.helm_repository:
-        name: prometheus-community
-        repo_url: https://prometheus-community.github.io/helm-charts
+        name: metrics-server
+        repo_url: https://kubernetes-sigs.github.io/metrics-server/
 
-    - name: Install or upgrade kube-prometheus-stack
+    - name: Install or upgrade metrics-server
       kubernetes.core.helm:
-        name: kube-prometheus-stack
-        chart_ref: prometheus-community/kube-prometheus-stack
-        release_namespace: monitoring
-        create_namespace: true
+        name: metrics-server
+        chart_ref: metrics-server/metrics-server
+        release_namespace: kube-system
         wait: true
+        values:
+          args:
+            # EKS kubelets use self-signed serving certs; metrics-server needs
+            # to skip verification to scrape them.
+            - --kubelet-insecure-tls
+            - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
 
+    # --- Kubernetes Dashboard ------------------------------------------------
+    - name: Ensure kubernetes-dashboard namespace exists
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ dashboard_namespace }}"
+        state: present
+
+    - name: Add kubernetes-dashboard helm repository
+      kubernetes.core.helm_repository:
+        name: kubernetes-dashboard
+        repo_url: https://kubernetes.github.io/dashboard/
+
+    - name: Install or upgrade kubernetes-dashboard
+      kubernetes.core.helm:
+        name: kubernetes-dashboard
+        chart_ref: kubernetes-dashboard/kubernetes-dashboard
+        release_namespace: "{{ dashboard_namespace }}"
+        wait: true
+        values:
+          # Keep Kong internal: all public traffic goes through our
+          # password-protected nginx reverse proxy instead.
+          kong:
+            proxy:
+              type: ClusterIP
+
+    - name: Create admin-user ServiceAccount for the Dashboard
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: admin-user
+            namespace: "{{ dashboard_namespace }}"
+
+    - name: Bind admin-user to cluster-admin
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: admin-user
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+            - kind: ServiceAccount
+              name: admin-user
+              namespace: "{{ dashboard_namespace }}"
+
+    - name: Create long-lived admin-user token Secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: admin-user-token
+            namespace: "{{ dashboard_namespace }}"
+            annotations:
+              kubernetes.io/service-account.name: admin-user
+          type: kubernetes.io/service-account-token
+
+    - name: Wait for admin-user token to be populated
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: "{{ dashboard_namespace }}"
+        name: admin-user-token
+      register: admin_token_secret
+      until:
+        - admin_token_secret.resources | length > 0
+        - admin_token_secret.resources[0].data is defined
+        - admin_token_secret.resources[0].data.token is defined
+      retries: 20
+      delay: 3
+
+    - name: Decode admin-user token
+      ansible.builtin.set_fact:
+        admin_token: "{{ admin_token_secret.resources[0].data.token | b64decode }}"
+      no_log: true
+
+    # --- Public reverse proxy (TLS + HTTP Basic Auth) ------------------------
+    - name: Generate self-signed TLS cert for dashboard proxy
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -nodes
+          - -newkey
+          - rsa:2048
+          - -keyout
+          - "{{ tls_key_path }}"
+          - -out
+          - "{{ tls_crt_path }}"
+          - -days
+          - "365"
+          - -subj
+          - "/CN=seyoawe-dashboard"
+        creates: "{{ tls_crt_path }}"
+      changed_when: false
+
+    - name: Read TLS cert
+      ansible.builtin.slurp:
+        src: "{{ tls_crt_path }}"
+      register: tls_crt_b64
+
+    - name: Read TLS key
+      ansible.builtin.slurp:
+        src: "{{ tls_key_path }}"
+      register: tls_key_b64
+      no_log: true
+
+    - name: Generate apr1 hash for admin password
+      ansible.builtin.shell: |
+        set -o pipefail
+        printf '%s' "${DASHBOARD_PW}" | openssl passwd -apr1 -stdin
+      environment:
+        DASHBOARD_PW: "{{ dashboard_admin_password }}"
+      args:
+        executable: /bin/bash
+      register: htpasswd_hash
+      changed_when: false
+      no_log: true
+
+    - name: Create TLS Secret for dashboard proxy
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          type: kubernetes.io/tls
+          metadata:
+            name: dashboard-proxy-tls
+            namespace: "{{ dashboard_namespace }}"
+          data:
+            tls.crt: "{{ tls_crt_b64.content }}"
+            tls.key: "{{ tls_key_b64.content }}"
+      no_log: true
+
+    - name: Create basic-auth Secret for dashboard proxy
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: dashboard-proxy-basicauth
+            namespace: "{{ dashboard_namespace }}"
+          stringData:
+            htpasswd: "{{ dashboard_admin_user }}:{{ htpasswd_hash.stdout }}"
+      no_log: true
+
+    - name: Create nginx config Secret for dashboard proxy
+      # The admin bearer token is inlined into the config so nginx can inject
+      # it on every upstream request. Storing this as a Secret (not ConfigMap)
+      # keeps the token out of plain etcd reads.
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: dashboard-proxy-nginx-conf
+            namespace: "{{ dashboard_namespace }}"
+          stringData:
+            nginx.conf: |
+              worker_processes auto;
+              events {
+                worker_connections 1024;
+              }
+              http {
+                # Allow large upload bodies for yaml apply, logs, etc.
+                client_max_body_size 50m;
+                proxy_http_version 1.1;
+                map $http_upgrade $connection_upgrade {
+                  default upgrade;
+                  ''      close;
+                }
+                server {
+                  listen 8443 ssl;
+                  ssl_certificate     /etc/nginx/tls/tls.crt;
+                  ssl_certificate_key /etc/nginx/tls/tls.key;
+                  ssl_protocols TLSv1.2 TLSv1.3;
+
+                  auth_basic           "Seyoawe Kubernetes Dashboard";
+                  auth_basic_user_file /etc/nginx/auth/htpasswd;
+
+                  location / {
+                    proxy_pass https://kubernetes-dashboard-kong-proxy.{{ dashboard_namespace }}.svc:443;
+                    proxy_ssl_verify off;
+                    proxy_set_header Host               $host;
+                    proxy_set_header X-Real-IP          $remote_addr;
+                    proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto  https;
+                    # Auto-login: inject the admin ServiceAccount token so the
+                    # user only has to get past basic auth, not the Dashboard
+                    # token dialog. If a future Dashboard release stops honoring
+                    # this header, the token is also printed in the run summary
+                    # as a manual fallback.
+                    proxy_set_header Authorization      "Bearer {{ admin_token }}";
+                    proxy_set_header Upgrade            $http_upgrade;
+                    proxy_set_header Connection         $connection_upgrade;
+                    proxy_read_timeout 300s;
+                  }
+                }
+              }
+      no_log: true
+
+    - name: Create dashboard proxy Deployment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: dashboard-proxy
+            namespace: "{{ dashboard_namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: dashboard-proxy
+            template:
+              metadata:
+                labels:
+                  app: dashboard-proxy
+                annotations:
+                  # Roll the pod whenever any of its inputs change.
+                  checksum/nginx-conf: "{{ (admin_token ~ dashboard_admin_password) | hash('sha256') }}"
+              spec:
+                containers:
+                  - name: nginx
+                    image: nginx:1.27-alpine
+                    ports:
+                      - name: https
+                        containerPort: 8443
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 32Mi
+                      limits:
+                        cpu: 100m
+                        memory: 128Mi
+                    volumeMounts:
+                      - name: nginx-conf
+                        mountPath: /etc/nginx/nginx.conf
+                        subPath: nginx.conf
+                        readOnly: true
+                      - name: tls
+                        mountPath: /etc/nginx/tls
+                        readOnly: true
+                      - name: auth
+                        mountPath: /etc/nginx/auth
+                        readOnly: true
+                    readinessProbe:
+                      tcpSocket:
+                        port: https
+                      initialDelaySeconds: 3
+                      periodSeconds: 5
+                    livenessProbe:
+                      tcpSocket:
+                        port: https
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+                volumes:
+                  - name: nginx-conf
+                    secret:
+                      secretName: dashboard-proxy-nginx-conf
+                  - name: tls
+                    secret:
+                      secretName: dashboard-proxy-tls
+                  - name: auth
+                    secret:
+                      secretName: dashboard-proxy-basicauth
+      no_log: true
+
+    - name: Create dashboard proxy LoadBalancer Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: dashboard-proxy
+            namespace: "{{ dashboard_namespace }}"
+            annotations:
+              # Pass TCP straight through; nginx does TLS termination.
+              service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+          spec:
+            type: LoadBalancer
+            selector:
+              app: dashboard-proxy
+            ports:
+              - name: https
+                port: 443
+                targetPort: https
+                protocol: TCP
+
+    - name: Wait for dashboard proxy LoadBalancer to be provisioned
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        namespace: "{{ dashboard_namespace }}"
+        name: dashboard-proxy
+      register: proxy_svc
+      until:
+        - proxy_svc.resources | length > 0
+        - proxy_svc.resources[0].status is defined
+        - proxy_svc.resources[0].status.loadBalancer is defined
+        - proxy_svc.resources[0].status.loadBalancer.ingress is defined
+        - proxy_svc.resources[0].status.loadBalancer.ingress | length > 0
+        - >-
+          (proxy_svc.resources[0].status.loadBalancer.ingress[0].hostname | default(''))
+          or (proxy_svc.resources[0].status.loadBalancer.ingress[0].ip | default(''))
+      retries: 40
+      delay: 10
+
+    - name: Set dashboard URL fact
+      ansible.builtin.set_fact:
+        dashboard_url: >-
+          https://{{
+            proxy_svc.resources[0].status.loadBalancer.ingress[0].hostname
+            | default(proxy_svc.resources[0].status.loadBalancer.ingress[0].ip)
+          }}
+
+    - name: Write dashboard access artifact
+      ansible.builtin.copy:
+        dest: "{{ dashboard_info_path }}"
+        mode: "0600"
+        content: |
+          ## Kubernetes Dashboard access
+
+          **URL:** {{ dashboard_url }}
+
+          **Basic-auth username:** `{{ dashboard_admin_user }}`
+          **Basic-auth password:** the `DASHBOARD_ADMIN_PASSWORD` secret you set in GitHub.
+
+          The reverse proxy uses a self-signed TLS cert — the browser will warn
+          on the first visit; accept once. After basic auth you should land
+          directly in the Dashboard (the admin token is injected for you).
+
+          If a future Dashboard release stops honoring the injected
+          `Authorization` header, paste this token in the login dialog:
+
+          ```
+          {{ admin_token }}
+          ```
+
+          The load balancer hostname changes each time the cluster is recreated.
+      no_log: true
+
+    - name: Print dashboard access info to playbook log
+      ansible.builtin.debug:
+        msg:
+          - "Dashboard URL: {{ dashboard_url }}"
+          - "Basic-auth username: {{ dashboard_admin_user }}"
+          - "Basic-auth password: (value of the DASHBOARD_ADMIN_PASSWORD secret)"
+          - "Dashboard info written to {{ dashboard_info_path }}"
+
+    # --- seyoawe app ---------------------------------------------------------
     - name: Install or upgrade seyoawe application chart
       kubernetes.core.helm:
         name: seyoawe-app
@@ -44,7 +455,9 @@
         values:
           engine:
             image:
+              repository: "{{ image_namespace }}/seyoawe-engine"
               tag: "{{ app_version }}"
           cli:
             image:
+              repository: "{{ image_namespace }}/seyoawe-cli"
               tag: "{{ app_version }}"

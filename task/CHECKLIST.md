@@ -14,8 +14,9 @@ Use this as the single source of truth for:
 ### 1. Containerization + Kubernetes Deployment
 - [x] Engine container Dockerfile exists: `docker/dockerfile.engine`
 - [x] CLI container Dockerfile exists: `docker/dockerfile.cli`
-- [ ] Kubernetes manifests exist under `k8s/`
-- [ ] Engine deployed as StatefulSet with probes + PVC + service
+- [x] Kubernetes manifests exist under `helm/seyoawe-app/templates/` (Helm chart)
+- [x] Engine deployed as StatefulSet with probes + PVC + Service
+- [x] CLI deployed as utility Deployment alongside the Engine
 
 ### 2–3. Unified CI Pipeline (Engine + CLI)
 - [x] CI workflow exists: `.github/workflows/ci-pipeline.yml`
@@ -29,20 +30,23 @@ Use this as the single source of truth for:
 - [ ] Optional: smarter bumping strategy (conventional commits / release rules)
 
 ### 5. Continuous Deployment Pipeline
-- [x] CD placeholder workflow: `.github/workflows/cd-deploy-aws.yml` (Terraform/Ansible/K8s echoes)
-- [x] Infra skeleton exists at `infra/terraform/` and `infra/ansible/`
-- [ ] Replace CD placeholders with real Terraform + Ansible + Kubernetes steps
+- [x] Real CD workflow: `.github/workflows/cd-deploy-aws.yml` (Terraform apply → Ansible → Helm)
+- [x] Paired teardown workflow: `.github/workflows/cd-destroy-aws.yml`
+- [x] Terraform at `infrastructure/terraform/` provisions VPC, EKS, IAM/OIDC, EBS CSI addon
+- [x] Ansible at `infrastructure/ansible/deploy.yml` installs StorageClass, metrics-server,
+      Kubernetes Dashboard + password-protected reverse proxy, and the seyoawe Helm release
 
 ### 6. Observability (Bonus)
-- [ ] `monitoring/` folder with Prometheus + Grafana config
-- [ ] Alert rules and dashboard exports
+- [x] `metrics-server` installed for in-cluster resource metrics
+- [x] Kubernetes Dashboard installed (public URL protected by `DASHBOARD_ADMIN_PASSWORD`)
+- [ ] Optional future work: Prometheus + Grafana + alert rules
 
 ---
 
 ## 2) What Is Already Working and Tested
 
 ### Runtime and Repo Layout
-- [x] New structure is active: `Engine/`, `CLI/`, `infra/`, `schemes/`, `task/`
+- [x] New structure is active: `Engine/`, `CLI/`, `helm/`, `infrastructure/`, `scripts/`, `schemes/`, `task/`
 - [x] Engine runs from `Engine/run.sh`
 - [x] `Engine/configuration/config.yaml` uses local relative directories and `customer_id: default`
 - [x] Webform assets helper flow in place (`link_assets.sh`, `serve_webform_assets.py`)
@@ -62,61 +66,58 @@ Use this as the single source of truth for:
 
 ---
 
-## 3) Infra Skeleton Status (Ready to Fill)
+## 3) Infrastructure Layout (Implemented)
 
-### Terraform placeholders
-- [x] `infra/terraform/providers.tf`
-- [x] `infra/terraform/versions.tf`
-- [x] `infra/terraform/main.tf`
-- [x] `infra/terraform/variables.tf`
-- [x] `infra/terraform/outputs.tf`
-- [x] `infra/terraform/environments/dev.tfvars`
-- [x] `infra/terraform/environments/prod.tfvars`
+### Terraform (`infrastructure/terraform/`)
+- [x] `backend.tf` (S3 remote state with native S3 locking)
+- [x] `versions.tf` (terraform + provider version pinning)
+- [x] `providers.tf` (AWS provider)
+- [x] `main.tf` (VPC, public subnets, EKS, IAM/OIDC, EBS CSI addon, SPOT node group)
+- [x] `variables.tf`
+- [x] `outputs.tf`
 
-### Ansible placeholders
-- [x] `infra/ansible/inventory/hosts.yml`
-- [x] `infra/ansible/playbooks/bootstrap.yml`
-- [x] `infra/ansible/playbooks/k8s_prereqs.yml`
-- [x] `infra/ansible/roles/common/README.md`
-- [x] `infra/ansible/roles/container_runtime/README.md`
-- [x] `infra/ansible/roles/observability_agents/README.md`
+### Ansible (`infrastructure/ansible/`)
+- [x] `deploy.yml` — single playbook that installs the `gp3` StorageClass,
+      `metrics-server`, the Kubernetes Dashboard, the password-protected
+      nginx reverse proxy (with TLS + admin token injection), and the
+      seyoawe Helm release.
+
+### Helm chart (`helm/seyoawe-app/`)
+- [x] `Chart.yaml`, `values.yaml`
+- [x] `templates/engine-statefulset.yaml`
+- [x] `templates/engine-service.yaml`
+- [x] `templates/cli-deployment.yaml`
+- [x] `templates/cli-configmap.yaml`
+
+### Operator scripts (`scripts/`)
+- [x] `open-dashboard.sh` — local port-forward to the Dashboard (zero ELB cost)
+- [x] `sawectl.sh` — runs `sawectl` inside the deployed CLI pod via `kubectl exec`
 
 ---
 
-## 4) Remaining Work (Execution Order)
+## 4) Remaining Work (Optional)
 
-### Phase A: Complete Deployable Platform
-- [ ] Add `k8s/` manifests (namespace, StatefulSet, service, ingress/PVC)
-- [ ] Implement real deploy job in `cd-deploy-aws.yml`:
-  - `terraform init/plan/apply`
-  - ansible playbook execution
-  - `kubectl apply` or Helm rollout
-  - post-deploy smoke tests
-
-### Phase B: Harden CI/CD
+### Hardening
 - [ ] Add linting gates (`ruff`/`flake8`) to CI jobs
 - [ ] Add coverage reporting and minimum threshold gate
 - [ ] Add image security scan (Trivy) and optional SBOM/signing
 
-### Phase C: Bonus Observability
-- [ ] Add `monitoring/` with Prometheus config and Grafana dashboards
+### Bonus Observability
+- [ ] Add Prometheus + Grafana (via Helm chart in the Ansible playbook)
 - [ ] Add basic alerts (engine health, CPU/memory, crash loops)
 
 ---
 
 ## 5) Required Secrets / Variables
 
-### Secrets
-- [ ] `DOCKERHUB_USERNAME`
-- [ ] `DOCKERHUB_TOKEN`
-- [ ] cloud provider credentials
-- [ ] `KUBECONFIG` or workload identity setup
-- [ ] optional: `SLACK_WEBHOOK_URL`
+### Secrets (in GitHub → Settings → Secrets and variables → Actions)
+- [x] `DOCKER_USERNAME`, `DOCKER_PASSWORD`
+- [x] `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- [x] `DASHBOARD_ADMIN_PASSWORD`
+- [ ] Optional: `JIRA_*`, `EMAIL_*` for CI failure notifications
 
 ### Variables
-- [ ] `CLOUD_REGION`
-- [ ] `K8S_NAMESPACE`
-- [ ] `TERRAFORM_WORKSPACE`
+- [x] `AWS_REGION`
 
 ---
 

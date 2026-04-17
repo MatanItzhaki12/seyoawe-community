@@ -7,4 +7,5 @@ metadata:
     app.kubernetes.io/component: cli
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
+  SEYOAWE_ENGINE: "{{ include "seyoawe-app.fullname" . }}-engine:{{ .Values.engine.service.port }}"
   ENGINE_URL: "http://{{ include "seyoawe-app.fullname" . }}-engine:{{ .Values.engine.service.port }}"

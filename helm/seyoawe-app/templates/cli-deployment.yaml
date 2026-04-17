@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.cli.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "seyoawe-app.name" . }}
@@ -24,16 +26,12 @@ spec:
         - name: cli
           image: "{{ .Values.cli.image.repository }}:{{ .Values.cli.image.tag }}"
           imagePullPolicy: {{ .Values.cli.image.pullPolicy }}
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "250m"
-          command:
-            - sleep
-            - infinity
+          # Keep the pod alive so users can `kubectl exec` into it to run
+          # sawectl commands against the in-cluster Engine. Minimal resources
+          # because the idle process is just `sleep infinity`.
+          command: ["sleep", "infinity"]
           envFrom:
             - configMapRef:
                 name: {{ include "seyoawe-app.fullname" . }}-cli-config
+          resources:
+            {{- toYaml .Values.cli.resources | nindent 12 }}

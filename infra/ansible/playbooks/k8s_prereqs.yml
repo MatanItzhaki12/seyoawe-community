@@ -1,3 +1,0 @@
----
-# Ansible k8s prerequisites playbook placeholder
-# Install container runtime, kube tooling, and system settings needed by Kubernetes nodes.

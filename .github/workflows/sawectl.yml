@@ -1,0 +1,48 @@
+name: Run sawectl
+
+on:
+  workflow_dispatch:
+    inputs:
+      args:
+        description: >-
+          sawectl arguments (e.g. "list-modules" or
+          "run --workflow /app/workflows/default/hello-world.yaml").
+        required: true
+        default: "--help"
+
+permissions:
+  contents: read
+
+jobs:
+  sawectl:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CLUSTER_NAME: seyoawe-eks
+      NAMESPACE: seyoawe
+      DEPLOYMENT: deployment/seyoawe-app-cli
+      SAWECTL_ARGS: ${{ inputs.args }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+
+      - name: Wait for CLI pod to be ready
+        run: kubectl -n "${NAMESPACE}" rollout status "${DEPLOYMENT}" --timeout=120s
+
+      - name: Run sawectl
+        shell: bash
+        run: |
+          set -euo pipefail
+          # SAWECTL_ARGS is passed via environment (not interpolated into the
+          # command string) so shell metacharacters in the user input cannot
+          # execute new commands; they only reach sawectl as arguments.
+          # shellcheck disable=SC2086
+          kubectl -n "${NAMESPACE}" exec -i "${DEPLOYMENT}" -- sawectl ${SAWECTL_ARGS}

@@ -1,24 +1,18 @@
 name: CD - Deploy AWS
 
 on:
-  workflow_run:
-    workflows: ["CI Pipeline"]
-    types:
-      - completed
   workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Image tag to deploy (e.g. latest, v0.1.3, or a commit SHA)."
+        required: false
+        default: "latest"
 
 permissions:
   contents: read
 
 jobs:
   deploy-aws:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == github.event.repository.default_branch
-      )
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
@@ -55,22 +49,13 @@ jobs:
           pip install "ansible>=9,<11" kubernetes
           ansible-galaxy collection install kubernetes.core
 
-      - name: Select app image version
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "APP_VERSION=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
-          else
-            echo "APP_VERSION=latest" >> "$GITHUB_ENV"
-          fi
-
       - name: Terraform init
         working-directory: infrastructure/terraform
         run: terraform init -backend-config="region=${{ vars.AWS_REGION }}"
 
       - name: Terraform apply
         working-directory: infrastructure/terraform
-        run: terraform apply -auto-approve -lock=false
+        run: terraform apply -auto-approve
 
       - name: Configure kubeconfig from Terraform output
         shell: bash
@@ -80,5 +65,51 @@ jobs:
           echo "Running: ${KUBECONFIG_CMD}"
           eval "${KUBECONFIG_CMD}"
 
-      - name: Deploy monitoring and app via Ansible
-        run: ansible-playbook infrastructure/ansible/deploy.yml -e "app_version=${APP_VERSION}"
+      - name: Check required secrets
+        env:
+          DASHBOARD_ADMIN_PASSWORD: ${{ secrets.DASHBOARD_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "${DASHBOARD_ADMIN_PASSWORD}" ]; then
+            echo "::error::DASHBOARD_ADMIN_PASSWORD is not set."
+            echo "Add it under: Repo → Settings → Secrets and variables → Actions → Secrets."
+            exit 1
+          fi
+
+      - name: Deploy seyoawe app via Ansible
+        env:
+          APP_VERSION: ${{ inputs.app_version }}
+          IMAGE_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+          DASHBOARD_ADMIN_PASSWORD: ${{ secrets.DASHBOARD_ADMIN_PASSWORD }}
+        run: |
+          # Password is forwarded via an Ansible extra-vars JSON file instead
+          # of -e "k=v" so special characters (spaces, $, ", !, etc.) survive
+          # intact and never hit the shell expansion.
+          EXTRA_VARS_FILE="$(mktemp)"
+          jq -n \
+            --arg app_version "${APP_VERSION}" \
+            --arg image_namespace "${IMAGE_NAMESPACE}" \
+            --arg dashboard_admin_password "${DASHBOARD_ADMIN_PASSWORD}" \
+            '{app_version: $app_version, image_namespace: $image_namespace, dashboard_admin_password: $dashboard_admin_password}' \
+            > "${EXTRA_VARS_FILE}"
+          trap 'rm -f "${EXTRA_VARS_FILE}"' EXIT
+          ansible-playbook infrastructure/ansible/deploy.yml \
+            --extra-vars "@${EXTRA_VARS_FILE}"
+
+      - name: Publish Dashboard access info to run summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "${GITHUB_WORKSPACE}/dashboard-access.md" ]; then
+            cat "${GITHUB_WORKSPACE}/dashboard-access.md" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "No dashboard-access.md produced." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload Dashboard access info as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-access
+          path: dashboard-access.md
+          retention-days: 1
+          if-no-files-found: ignore

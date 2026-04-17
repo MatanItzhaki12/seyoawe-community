@@ -26,15 +26,18 @@ spec:
           image: "{{ .Values.engine.image.repository }}:{{ .Values.engine.image.tag }}"
           imagePullPolicy: {{ .Values.engine.image.pullPolicy }}
           resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "250m"
+            {{- toYaml .Values.engine.resources | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.engine.service.port }}
+          {{- with .Values.engine.probes.readiness }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.engine.probes.liveness }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: engine-data
               mountPath: /data
