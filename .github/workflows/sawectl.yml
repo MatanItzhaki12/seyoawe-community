@@ -7,7 +7,8 @@ on:
         description: >-
           sawectl arguments (e.g. "list-modules" or
           "run --workflow /app/workflows/default/hello-world.yaml").
-        required: true
+          Leave empty to get `sawectl --help`.
+        required: false
         default: "--help"
 
 permissions:

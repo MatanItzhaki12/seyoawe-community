@@ -57,7 +57,16 @@
    - Creates and pushes the git tag.
    - Builds both Docker images and pushes them to Docker Hub tagged with `<version>`, `<commit-sha>`, and `latest`.
 
-### CD — `cd-deploy-aws.yml` (manual, `workflow_dispatch`)
+### CD — `cd-deploy-aws.yml` (auto on CI success, or manual)
+
+Triggers:
+
+- **Automatic:** runs when the **CI Pipeline** finishes successfully on the default branch (`workflow_run` trigger). The deploy checks out the exact commit CI validated and uses that commit's SHA as the image tag, so what ships is byte-for-byte what passed tests.
+- **Manual:** **Actions → CD - Deploy AWS → Run workflow** lets you pick any image tag (`latest`, `v0.1.3`, a specific SHA) — useful for redeploying an older build or recreating a destroyed cluster without pushing a new commit.
+
+> ⚠️ **Cost warning:** because CD runs on every green push to the default branch, each merge spins up a fresh EKS cluster that bills until you run the destroy workflow. If you'd rather only deploy on demand, delete the `workflow_run:` block from `.github/workflows/cd-deploy-aws.yml` and keep only `workflow_dispatch:`.
+
+Deploy steps (either trigger):
 
 1. `terraform apply` builds/updates: VPC, public subnets, IGW, IAM roles, EKS control plane, managed node group (SPOT), OIDC provider, IRSA role for EBS CSI, and the `aws-ebs-csi-driver` addon.
 2. Configures kubeconfig against the new cluster.
@@ -78,11 +87,12 @@ All cleanup steps are best-effort — the workflow still works if the cluster is
 
 ### How this maps to the architecture diagrams
 
-The three diagrams in `schemes/` are the reference architecture. The implementation matches them with three conscious deviations, all driven by free-tier AWS cost constraints or simplicity:
+The three diagrams in `schemes/` are the reference architecture. The implementation matches them with two conscious deviations, both driven by simplicity / free-tier node sizing:
 
-1. **CD is manual, not auto-triggered by CI** (`CICD_Arch.png` shows "success → Run cd-deploy-aws"). Auto-deploying on every green main-branch push would drain the $200 AWS credit quickly. CD is `workflow_dispatch` instead — you run it when you want a cluster, destroy it when you're done.
-2. **`LoadBalancer` Service instead of `Ingress` + `NodePort`** (`Workflow_Arch.png`). Same role ("cluster traffic entry"); AWS Classic ELB + a Kubernetes Service is one fewer moving part than a separate Ingress controller deployment for a single app.
-3. **Kubernetes Dashboard + `metrics-server` instead of Prometheus + Grafana** (`Workflow_Arch.png`). Much smaller RAM footprint — fits comfortably on `t3.small` SPOT nodes.
+1. **`LoadBalancer` Service instead of `Ingress` + `NodePort`** (`Workflow_Arch.png`). Same role ("cluster traffic entry"); AWS Classic ELB + a Kubernetes Service is one fewer moving part than a separate Ingress controller deployment for a single app.
+2. **Kubernetes Dashboard + `metrics-server` instead of Prometheus + Grafana** (`Workflow_Arch.png`). Much smaller RAM footprint — fits comfortably on `t3.small` SPOT nodes.
+
+Auto-trigger from CI → CD (per `CICD_Arch.png`) is implemented and on by default; see the cost warning in the CD section above if you'd prefer to flip it back to manual-only.
 
 Everything else (Engine `StatefulSet` with PVC + probes, CLI utility `Deployment`, Docker Hub image repos, Terraform + Ansible provisioning from GitHub Actions) is implemented as drawn.
 
@@ -167,12 +177,17 @@ Every successful main-branch build pushes three tags: the semver version, the co
 
 ### 4. Deploy to AWS
 
-1. GitHub → **Actions** → **CD - Deploy AWS** → **Run workflow**. Fill in:
-   - `app_version`: `latest` (or a specific `vX.Y.Z` tag / commit SHA).
+There are two ways the deploy workflow runs:
 
-   That's it — no IP, no CIDR. Access is controlled by the `DASHBOARD_ADMIN_PASSWORD` secret you configured above.
+- **Automatic (default):** as soon as the CI Pipeline finishes green on `main`, the CD workflow fires on its own — nothing to click. It deploys the exact commit SHA that CI just pushed to Docker Hub.
+- **Manual:** GitHub → **Actions** → **CD - Deploy AWS** → **Run workflow**. Fill in:
+  - `app_version`: `latest` (or a specific `vX.Y.Z` tag / commit SHA).
 
-2. Wait ~10–15 minutes on the first run (EKS control plane creation is slow). Subsequent updates only take 2–3 minutes.
+  Access is controlled by the `DASHBOARD_ADMIN_PASSWORD` secret — no IP, no CIDR.
+
+Wait ~10–15 minutes on the first run (EKS control plane creation is slow). Subsequent updates only take 2–3 minutes.
+
+> ⚠️ Auto-deploy means every merge to `main` creates / updates an EKS cluster that bills by the hour. If you don't want that, disable the `workflow_run:` trigger in `.github/workflows/cd-deploy-aws.yml` (details in the "CD — `cd-deploy-aws.yml`" section above) and always run it manually. **Regardless of which path you pick, run the destroy workflow when you're done for the day.**
 
 3. When the run finishes, open its page and scroll to the **summary** at the bottom. You'll see:
    ```
