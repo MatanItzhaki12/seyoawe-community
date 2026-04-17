@@ -40,9 +40,9 @@ variable "node_capacity_type" {
 }
 
 variable "node_desired_size" {
-  description = "Desired number of worker nodes."
+  description = "Desired number of worker nodes. 3 gives us ~24 pod slots on t3.small (8 per node), which fits kube-system + Dashboard + Kong + the seyoawe workload with headroom."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "node_min_size" {
@@ -54,5 +54,5 @@ variable "node_min_size" {
 variable "node_max_size" {
   description = "Maximum number of worker nodes."
   type        = number
-  default     = 2
+  default     = 3
 }
