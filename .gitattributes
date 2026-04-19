@@ -1,0 +1,6 @@
+# Force LF line endings on files that must run on Linux (bash, Docker images,
+# CI runners). Without this, Git on Windows checks them out with CRLF and the
+# kernel rejects shebangs like `#!/usr/bin/env bash\r`.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf

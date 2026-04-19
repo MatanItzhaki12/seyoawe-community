@@ -1,5 +1,10 @@
 nameOverride: ""
-fullnameOverride: ""
+# Pin the fullname so resources end up named exactly seyoawe-app-engine /
+# seyoawe-app-cli (instead of helm's default {release}-{chart}-{component},
+# which would produce the doubled "seyoawe-app-seyoawe-app-engine"). The
+# wrapper script, the CI workflow, and the README all reference the
+# undoubled names, so this keeps everything consistent.
+fullnameOverride: "seyoawe-app"
 
 engine:
   replicaCount: 1
