@@ -16,10 +16,10 @@ def test_default_hello_world_workflow_shape():
     assert "command_module.Command.run" in text
 
 
-# @pytest.mark.unit
-# def test_sample_workflow_contains_expected_fields():
-#     path = REPO_ROOT / "Engine" / "workflows" / "samples" / "command_and_slack.yaml"
-#     contents = path.read_text(encoding="utf-8")
-#     assert "workflow:" in contents
-#     assert "trigger:" in contents
-#     assert "steps:" in contents
+@pytest.mark.unit
+def test_sample_workflow_contains_expected_fields():
+    path = REPO_ROOT / "Engine" / "workflows" / "samples" / "command_and_slack.yaml"
+    contents = path.read_text(encoding="utf-8")
+    assert "workflow:" in contents
+    assert "trigger:" in contents
+    assert "steps:" in contents
