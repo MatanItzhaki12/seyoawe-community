@@ -8,7 +8,7 @@ engine:
     repository: seyoawe-engine
     tag: latest
     # "Always" is appropriate while tag is a mutable label like "latest".
-    # Switch to "IfNotPresent" once tags are immutable (commit SHA or semver).
+    # Switch to "IfNotPresent" once you pin to an immutable semver tag.
     pullPolicy: Always
   service:
     port: 8080

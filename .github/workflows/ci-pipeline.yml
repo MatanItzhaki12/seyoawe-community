@@ -193,7 +193,6 @@ jobs:
       - name: Build and push Engine and CLI images
         env:
           VERSION: ${{ steps.ver.outputs.version }}
-          SHA: ${{ github.sha }}
           DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
         run: |
           set -euo pipefail
@@ -201,15 +200,11 @@ jobs:
           CLI_IMAGE="${DOCKERHUB_NAMESPACE}/seyoawe-cli"
           docker build -f docker/dockerfile.engine \
             -t "${ENGINE_IMAGE}:${VERSION}" \
-            -t "${ENGINE_IMAGE}:${SHA}" \
             -t "${ENGINE_IMAGE}:latest" .
           docker build -f docker/dockerfile.cli \
             -t "${CLI_IMAGE}:${VERSION}" \
-            -t "${CLI_IMAGE}:${SHA}" \
             -t "${CLI_IMAGE}:latest" .
           docker push "${ENGINE_IMAGE}:${VERSION}"
-          docker push "${ENGINE_IMAGE}:${SHA}"
           docker push "${ENGINE_IMAGE}:latest"
           docker push "${CLI_IMAGE}:${VERSION}"
-          docker push "${CLI_IMAGE}:${SHA}"
           docker push "${CLI_IMAGE}:latest"
