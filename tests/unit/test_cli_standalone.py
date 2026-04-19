@@ -39,7 +39,7 @@ def test_sawectl_help_exits_zero():
     assert "sawectl" in p.stdout.lower() or "Usage" in p.stdout
 
 
-# @pytest.mark.unit
-# def test_deliberate_failure_for_ci_notifications():
-#     # TEMPORARY: remove this test after verifying Jira + email on-failure steps.
-#     assert False, "Deliberate failure to test CI notifications"
+@pytest.mark.unit
+def test_deliberate_failure_for_ci_notifications():
+    # TEMPORARY: remove this test after verifying Jira + email on-failure steps.
+    assert False, "Deliberate failure to test CI notifications"
